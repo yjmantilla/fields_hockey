@@ -152,7 +152,7 @@ function CollisionSystem(item,index,reality,entities)
         var collisionMode = item.components.Collides
         for (var i = 0; i < reality.Collisionables.length; i++) 
             {   
-                if (i==index){ //avoid self interaction
+                if (reality.Collisionables[i]==index){ //avoid self interaction
                     continue
                 }
                 var collisionable = entities[reality.Collisionables[i]]
@@ -226,18 +226,19 @@ function setup() {
     Reality['centery']=function(){return height/2}
     Reality['wall-border-ratio']=1/64
     Reality['puck-dim']=1/32*Math.min(width,height)
-    Reality['goal'] = 1/3
+    Reality['goal'] = 1/5
     Reality['striker-dim']=1/6
     // Puck
     Entities.push(add_components(Entity(label='Puck'),[Collides('bounce'),Position(x=Reality.centerx(),y=Reality.centery()),Velocity(randint(-1,1)*randint(Reality.minvel,Reality.maxvel),randint(-1,1)*randint(Reality.minvel,Reality.maxvel)),Acceleration(0,0),Appearance(shape='circle',x=Reality['puck-dim'],y=Reality['puck-dim'],color='#00FF00')]))
 
     GAP = Reality['goal']
     NOGAP = Reality['striker-dim']
+
     // Walls
     Entities.push(add_components(Entity(label='Wall_Up-L'),  [Collisionable(),Position(x=width*GAP/2,y=0),Appearance(shape='rect',x=width*GAP/2,y=height*Reality['wall-border-ratio'],color='#FFFF00')]))
     Entities.push(add_components(Entity(label='Wall_Up-R'),  [Collisionable(),Position(x=width-width*GAP/2,y=0),Appearance(shape='rect',x=width*GAP/2,y=height*Reality['wall-border-ratio'],color='#FFFF00')]))
-    Entities.push(add_components(Entity(label='Wall_Left'),  [Collisionable(),Position(x=0,y=Reality.centery()),Appearance(shape='rect',x=width*Reality["wall-border-ratio"],y=height/2,color='#FFFF00')]))
     Entities.push(add_components(Entity(label='Wall_Right'), [Collisionable(),Position(x=width,y=Reality.centery()),Appearance(shape='rect',x=width*Reality["wall-border-ratio"],y=height/2,color='#FFFF00')]))
+    Entities.push(add_components(Entity(label='Wall_Left'),  [Collisionable(),Position(x=0,y=Reality.centery()),Appearance(shape='rect',x=width*Reality["wall-border-ratio"],y=height/2,color='#FFFF00')]))
     Entities.push(add_components(Entity(label='Wall_Down-L'),[Collisionable(),Position(x=width*GAP/2,y=height),Appearance(shape='rect',x=width*GAP/2,y=height*Reality['wall-border-ratio'],color='#FFFF00')]))
     Entities.push(add_components(Entity(label='Wall_Down-R'),[Collisionable(),Position(x=width-width*GAP/2,y=height),Appearance(shape='rect',x=width*GAP/2,y=height*Reality['wall-border-ratio'],color='#FFFF00')]))
 
@@ -251,7 +252,7 @@ function setup() {
 
   function draw() {
     background(Reality.background); // commenting this will leave a trail for every moving object
-  
+    circle(0,0,100)
     Entities.forEach((item,index) =>{
         RenderSystem(item);
         MoveSystem(item,Reality.timedelta);
