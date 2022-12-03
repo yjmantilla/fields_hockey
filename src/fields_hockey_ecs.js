@@ -79,9 +79,11 @@ function randint(min,max){
     return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
+function randsign(){
+    return random([-1,1])
+}
+
 // Reality Params
-
-
 
 var Reality = {
     timedelta:1,
@@ -208,9 +210,15 @@ function BotSystem(item,reality,entities){
         var ref = item.components.Position
         reality.Pucks.forEach(puckidx =>{
             var puck = entities[puckidx].components.Position
-            relativeXpos = relative_position(puck.x,puck.y,ref.x,ref.y)[0]
+            relativepos = relative_position(puck.x,puck.y,ref.x,ref.y)
             // Should it take into account velocity or momemtum???
-            item.components.Velocity.x = Math.sign(relativeXpos)*item.components.Botsify.speed
+            if (Math.abs(relativepos[1]) <= reality.height/2){ //go towards puck, maybe only if puck velocity is towards you???
+            item.components.Velocity.x = Math.sign(relativepos[0])*item.components.Botsify.speed
+            }
+            else{ //go towards center
+                relativepos = relative_position(reality.get_centerx(),reality.get_centery(),ref.x,ref.y)
+                item.components.Velocity.x = Math.sign(relativepos[0])*item.components.Botsify.speed
+            }
         });
     }
 }
@@ -220,31 +228,32 @@ function BotSystem(item,reality,entities){
 function setup() {
     createCanvas(windowWidth, windowHeight);
     background(Reality.background);
-    Reality[width]=width // maybe later do some wall-based metrics?
-    Reality[height]=height
-    Reality['centerx']=function(){return width/2}
-    Reality['centery']=function(){return height/2}
+    Reality['width']=width // maybe later do some wall-based metrics?
+    Reality['height']=height
+    Reality['get_centerx']=function(){return width/2}
+    Reality['get_centery']=function(){return height/2}
     Reality['wall-border-ratio']=1/64
     Reality['puck-dim']=1/32*Math.min(width,height)
-    Reality['goal'] = 1/5
+    Reality['non-goal'] = 1/5
     Reality['striker-dim']=1/6
+    Reality['striker-speed']=Reality.maxvel*0.6
     // Puck
-    Entities.push(add_components(Entity(label='Puck'),[Collides('bounce'),Position(x=Reality.centerx(),y=Reality.centery()),Velocity(randint(-1,1)*randint(Reality.minvel,Reality.maxvel),randint(-1,1)*randint(Reality.minvel,Reality.maxvel)),Acceleration(0,0),Appearance(shape='circle',x=Reality['puck-dim'],y=Reality['puck-dim'],color='#00FF00')]))
+    Entities.push(add_components(Entity(label='Puck'),[Collides('bounce'),Position(x=Reality.get_centerx(),y=Reality.get_centery()),Velocity(randsign()*randint(Reality.minvel,Reality.maxvel),randsign()*randint(Reality.minvel,Reality.maxvel)),Acceleration(0,0),Appearance(shape='circle',x=Reality['puck-dim'],y=Reality['puck-dim'],color='#00FF00')]))
 
-    GAP = Reality['goal']
+    GAP = Reality['non-goal']
     NOGAP = Reality['striker-dim']
 
     // Walls
     Entities.push(add_components(Entity(label='Wall_Up-L'),  [Collisionable(),Position(x=width*GAP/2,y=0),Appearance(shape='rect',x=width*GAP/2,y=height*Reality['wall-border-ratio'],color='#FFFF00')]))
     Entities.push(add_components(Entity(label='Wall_Up-R'),  [Collisionable(),Position(x=width-width*GAP/2,y=0),Appearance(shape='rect',x=width*GAP/2,y=height*Reality['wall-border-ratio'],color='#FFFF00')]))
-    Entities.push(add_components(Entity(label='Wall_Right'), [Collisionable(),Position(x=width,y=Reality.centery()),Appearance(shape='rect',x=width*Reality["wall-border-ratio"],y=height/2,color='#FFFF00')]))
-    Entities.push(add_components(Entity(label='Wall_Left'),  [Collisionable(),Position(x=0,y=Reality.centery()),Appearance(shape='rect',x=width*Reality["wall-border-ratio"],y=height/2,color='#FFFF00')]))
+    Entities.push(add_components(Entity(label='Wall_Right'), [Collisionable(),Position(x=width,y=Reality.get_centery()),Appearance(shape='rect',x=width*Reality["wall-border-ratio"],y=height/2,color='#FFFF00')]))
+    Entities.push(add_components(Entity(label='Wall_Left'),  [Collisionable(),Position(x=0,y=Reality.get_centery()),Appearance(shape='rect',x=width*Reality["wall-border-ratio"],y=height/2,color='#FFFF00')]))
     Entities.push(add_components(Entity(label='Wall_Down-L'),[Collisionable(),Position(x=width*GAP/2,y=height),Appearance(shape='rect',x=width*GAP/2,y=height*Reality['wall-border-ratio'],color='#FFFF00')]))
     Entities.push(add_components(Entity(label='Wall_Down-R'),[Collisionable(),Position(x=width-width*GAP/2,y=height),Appearance(shape='rect',x=width*GAP/2,y=height*Reality['wall-border-ratio'],color='#FFFF00')]))
 
     // Strikers
-    Entities.push(add_components(Entity(label='Striker_Down'),[Collides('noclip'),Botsify(1), Collisionable(),Position(x=width/2,y=height),Velocity(0,0),Appearance(shape='rect',x=width*NOGAP/2,y=height*Reality['wall-border-ratio'],color='#FF00FF')]))
-    Entities.push(add_components(Entity(label='Striker_Up'),  [Collides('noclip'),Botsify(1), Collisionable(),Position(x=width/2,y=0),Velocity(0,0),Appearance(shape='rect',x=width*NOGAP/2,y=height*Reality['wall-border-ratio'],color='#FF00FF')]))
+    Entities.push(add_components(Entity(label='Striker_Down'),[Collides('noclip'),Botsify(Reality['striker-speed']), Collisionable(),Position(x=width/2,y=height),Velocity(0,0),Appearance(shape='rect',x=width*NOGAP/2,y=height*Reality['wall-border-ratio'],color='#FF00FF')]))
+    Entities.push(add_components(Entity(label='Striker_Up'),  [Collides('noclip'),Botsify(Reality['striker-speed']), Collisionable(),Position(x=width/2,y=0),Velocity(0,0),Appearance(shape='rect',x=width*NOGAP/2,y=height*Reality['wall-border-ratio'],color='#FF00FF')]))
     
     Reality.Collisionables = collectItems(Entities,'"Collisionable" in item.components')
     Reality.Pucks = collectItems(Entities,'item.label.includes("Puck")')
@@ -252,7 +261,6 @@ function setup() {
 
   function draw() {
     background(Reality.background); // commenting this will leave a trail for every moving object
-    circle(0,0,100)
     Entities.forEach((item,index) =>{
         RenderSystem(item);
         MoveSystem(item,Reality.timedelta);
