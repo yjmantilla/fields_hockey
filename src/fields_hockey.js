@@ -2,6 +2,7 @@ var puck;
 var walls;
 var scores = [0,0];
 var borderOffset;
+
 function setup() {
   createCanvas(windowWidth, windowHeight);
   background(0);
@@ -60,7 +61,7 @@ function windowResized() {
 
 function rescale(){
   minDim = min([width,height])
-  borderOffset = minDim*0.03; // 10% of minimum dimension
+  borderOffset = minDim*0.03; // 3% of minimum dimension
   walls = {positiveX:width-borderOffset,negativeX:0+borderOffset,positiveY:height-borderOffset,negativeY:0+borderOffset,restitution:walls.restitution,width:borderOffset}
   puck.radius = minDim * 0.03;
 }
