@@ -43,6 +43,17 @@ function InfluencedByField(polarity=1,intensity=1){
 function Returnable(x,y,vx,vy){
     return {'Returnable':{'Position':{'x':x,'y':y},'Velocity':{'x':vx,'y':vy}}}
 }
+
+function TrackScore(){
+    return {'TrackScore':{'value':0}}
+}
+
+function Scoreable(){
+    return {'Scoreable':true}
+}
+function keyControllable(keys){ //keys = string. first letter is left , second letter is right
+    return {'keyControllable':{'keys':keys}}
+}
 // Utils
 
 function add_components(entity,components){
@@ -72,6 +83,8 @@ function collectItems(entities,query){
     });
     return match
 }
+
+const average = arr => arr.reduce( ( p, c ) => p + c, 0 ) / arr.length;
 
 function relative_position(x,y,refx,refy){
     return [x-refx,y-refy]
@@ -202,18 +215,18 @@ function CollisionSystem(item,index,reality,entities)
                 if (hit)
                 {   
                     if (collisionMode.includes('bounce')){
-                    if (blabel.includes("Up")){
-                        velocity.y =Math.abs(velocity.y)
-                    }
-                    if (blabel.includes("Down")){
-                        velocity.y =-1*Math.abs(velocity.y)
-                    }
-                    if (blabel.includes("Left")){
-                        velocity.x = Math.abs(velocity.x)
-                    }
-                    if (blabel.includes("Right")){
-                        velocity.x = -1*Math.abs(velocity.x)
-                    }
+                        if (blabel.includes("Up")){
+                            velocity.y =Math.abs(velocity.y)
+                        }
+                        if (blabel.includes("Down")){
+                            velocity.y =-1*Math.abs(velocity.y)
+                        }
+                        if (blabel.includes("Left")){
+                            velocity.x = Math.abs(velocity.x)
+                        }
+                        if (blabel.includes("Right")){
+                            velocity.x = -1*Math.abs(velocity.x)
+                        }
                     }
 
                     if (collisionMode.includes('noclip')){
@@ -223,7 +236,7 @@ function CollisionSystem(item,index,reality,entities)
                         if (blabel.includes("-R") && Math.sign(velocity.x)>0){
                             velocity.x = 0
                         }
-                        }
+                    }
     
                 }
             }
@@ -239,27 +252,74 @@ function BotSystem(item,reality,entities){
             var puck = entities[puckidx].components.Position
             relativepos = relative_position(puck.x,puck.y,ref.x,ref.y)
             // Should it take into account velocity or momemtum???
+            speed = item.components.Botsify.speed
+            if (speed==='global'){
+                speed = reality['striker-speed']
+            }
             if (Math.abs(relativepos[1]) <= reality.height/2){ //go towards puck, maybe only if puck velocity is towards you???
-            item.components.Velocity.x = Math.sign(relativepos[0])*item.components.Botsify.speed
+            item.components.Velocity.x = Math.sign(relativepos[0])*speed
             }
             else{ //go towards center
                 relativepos = relative_position(reality.get_centerx(),reality.get_centery(),ref.x,ref.y)
-                item.components.Velocity.x = Math.sign(relativepos[0])*item.components.Botsify.speed
+                item.components.Velocity.x = Math.sign(relativepos[0])*speed
             }
         });
     }
 }
 
-function ReturnSystem(item,Reality){
+function keyControlSystem(item,reality){
+    query = "keyControllable" in item.components && "Position" in item.components && "Velocity" in item.components
+    if (query){
+        keys = item.components.keyControllable.keys.toUpperCase()
+        if(keyIsDown(keys.charCodeAt(0))){
+            dir = -1
+        }
+        else if(keyIsDown(keys.charCodeAt(1))){
+            dir = 1
+        }
+        else{
+            dir =0
+        }
+        item.components.Velocity.x = dir*reality['striker-speed']
+    }
+}
+
+function ReturnSystem(item,Reality,entities){
     query = "Returnable" in item.components && "Position" in item.components && "Velocity" in item.components
     if (query){
-        out_x = item.components.Position.x < Reality.originx - Reality.border || item.components.Position.x > Reality.width + Reality.border
-        out_y = item.components.Position.y < Reality.originy - Reality.border || item.components.Position.y > Reality.height + Reality.border
+        pos = item.components.Position
+        out_x = pos.x < Reality.offset_x - Reality.border || pos.x > Reality.width + Reality.border
+        out_y = pos.y < Reality.offset_y - Reality.border || pos.y > Reality.height + Reality.border
         if (out_x || out_y){
-            item.components.Position.x = random_handler(item.components.Returnable.Position.x,Reality.originx,Reality.width)
-            item.components.Position.y = random_handler(item.components.Returnable.Position.y,Reality.originy,Reality.height)
+
+            query = 'Scoreable' in item.components
+            if (query){
+                //get striker closer to scoreable (so that it will count against it) --> -1
+                //or get the one furthest.. --> +1
+                ScoreTrackersDistances = []
+                ScoreTrackersIndexes = []
+                Reality.Strikers.forEach(elem =>{
+                    scoreitem = entities[elem]
+                    if ('Position' in scoreitem.components){
+                        pos_score=scoreitem.components.Position
+                        ScoreTrackersDistances.push(squared_distance(pos.x,pos.y,pos_score.x,pos_score.y))
+                        ScoreTrackersIndexes.push(elem)
+                    }
+                });
+                // As there are maximum two Strikers to use the implemented logic, just use ifs to search the max
+                if (ScoreTrackersDistances[0]>ScoreTrackersDistances[1]){
+                    entities[ScoreTrackersIndexes[0]].components.TrackScore.value +=1
+                }
+                else{
+                    entities[ScoreTrackersIndexes[1]].components.TrackScore.value +=1
+                }
+            }
+
+            item.components.Position.x = random_handler(item.components.Returnable.Position.x,Reality.offset_x,Reality.width)
+            item.components.Position.y = random_handler(item.components.Returnable.Position.y,Reality.offset_y,Reality.height)
             item.components.Velocity.x = random_handler(item.components.Returnable.Velocity.x,Reality.minvel ,Reality.maxvel)
             item.components.Velocity.y = random_handler(item.components.Returnable.Velocity.y,Reality.minvel ,Reality.maxvel)
+
         }
     }
 }
@@ -305,7 +365,18 @@ function FieldSystem(item,index,Reality,Entities){
     
         }
 
-
+function ShowScoreSystem(item){
+    query = "TrackScore" in item.components && 'Appearance' in item.components && 'Position' in item.components
+    if (query){
+        var appearance = item.components.Appearance
+        var position = item.components.Position
+        var score = item.components.TrackScore.value
+        itemcorners = cornerFromRadius(position.x,position.y,appearance.x,appearance.y)
+        //text(score.toString(),itemcorners[0][0], itemcorners[0][1], itemcorners[1][0], itemcorners[1][1])
+        textSize(average([appearance.dimx,appearance.dimy]))
+        text(score.toString(),position.x,position.y)
+    }
+}
 
 function setup() {
     createCanvas(windowWidth, windowHeight);
@@ -314,59 +385,60 @@ function setup() {
     Reality.timedelta=1
     Reality.maxvel=5
     Reality.minvel=3
-
-    Reality.originx = 0
-    Reality.originy = 0
-    Reality['width']=width // maybe later do some wall-based metrics?
-    Reality['height']=height
-    Reality['get_centerx']=function(){return width/2}
-    Reality['get_centery']=function(){return height/2}
+    Reality.scale_x=0.9
+    Reality.scale_y=0.9
+    Reality['width']=function(){return width*Reality.scale_x}() // maybe later do some wall-based metrics?
+    Reality['height']=function(){return height*Reality.scale_y}()
+    Reality['offset_x']=function(){return Reality.width*(1-Reality.scale_x)/2}()
+    Reality['offset_y']=function(){return Reality.height*(1-Reality.scale_y)/2}()
+    Reality['get_centerx']=function(){return Reality.offset_x + Reality.width/2}
+    Reality['get_centery']=function(){return Reality.offset_y + Reality.height/2}
     Reality['wall-border-ratio']=1/64
-    Reality['puck-dim']=1/32*Math.min(width,height)
+    Reality['puck-dim']=1/32*Math.min(Reality.width,Reality.height)
     Reality['non-goal'] = 1/5
     Reality['striker-dim']=1/6
     Reality['striker-speed']=Reality.maxvel*0.6
     Reality['field-balance']=0.5 // Balance between attractors and repulsors
-    Reality['field-cardinality']= 11//total number of attractors + repulsors
-    Reality['border']=100//1/3*Math.min(width,height)
+    Reality['field-cardinality']= 4//total number of attractors + repulsors
+    Reality['border']=100//1/3*Math.min(Reality.width,Reality.height)
     Reality['max-accel']=1
-    Reality['FieldIntensity']=500
-    Reality.randpos=function(){return [randint(0,Reality.width),randint(0,Reality.height)]} // Maybe add offset to avoid wall clipping, using the wall border or the radius of particles
+    Reality['FieldIntensity']=1000
+    Reality.randpos=function(){return [randint(Reality.offset_x,Reality.width),randint(Reality.offset_y,Reality.height)]} // Maybe add offset to avoid wall clipping, using the wall border or the radius of particles
     // Puck
-    Entities.push(add_components(Entity(label='Puck'),[InfluencedByField(-1,1),Collides('bounce'),Returnable(x=Reality.get_centerx(),y=Reality.get_centery(),vx='random',vy='random'),Position(x=Reality.get_centerx(),y=Reality.get_centery()),Velocity(randsign()*randint(Reality.minvel,Reality.maxvel),randsign()*randint(Reality.minvel,Reality.maxvel)),Acceleration(0,0),Appearance(shape='circle',x=Reality['puck-dim'],y=Reality['puck-dim'],color='#00FF00')]))
+    Entities.push(add_components(Entity(label='Puck'),[Scoreable(),InfluencedByField(-1,1),Collides('bounce'),Returnable(x=Reality.get_centerx(),y=Reality.get_centery(),vx='random',vy='random'),Position(x=Reality.get_centerx(),y=Reality.get_centery()),Velocity(randsign()*randint(Reality.minvel,Reality.maxvel),randsign()*randint(Reality.minvel,Reality.maxvel)),Acceleration(0,0),Appearance(shape='circle',x=Reality['puck-dim'],y=Reality['puck-dim'],color='#00FF00')]))
 
     GAP = Reality['non-goal']
     NOGAP = Reality['striker-dim']
-
-    k=1;//interactor initial velocity modifier
-    K=1; //interactor-interactor interactions boolean
+    Reality.interactor_init_vel_k=1;//interactor initial velocity modifier
+    Reality.between_interactors_interaction = 0;//interactor-interactor interactions boolean
     // Walls
-    Entities.push(add_components(Entity(label='Wall_Up-L'),  [Collisionable(),Position(x=width*GAP/2,y=0),Appearance(shape='rect',x=width*GAP/2,y=height*Reality['wall-border-ratio'],color='#FFFF00')]))
-    Entities.push(add_components(Entity(label='Wall_Up-R'),  [Collisionable(),Position(x=width-width*GAP/2,y=0),Appearance(shape='rect',x=width*GAP/2,y=height*Reality['wall-border-ratio'],color='#FFFF00')]))
-    Entities.push(add_components(Entity(label='Wall_Right'), [Collisionable(),Position(x=width,y=Reality.get_centery()),Appearance(shape='rect',x=width*Reality["wall-border-ratio"],y=height/2,color='#FFFF00')]))
-    Entities.push(add_components(Entity(label='Wall_Left'),  [Collisionable(),Position(x=0,y=Reality.get_centery()),Appearance(shape='rect',x=width*Reality["wall-border-ratio"],y=height/2,color='#FFFF00')]))
-    Entities.push(add_components(Entity(label='Wall_Down-L'),[Collisionable(),Position(x=width*GAP/2,y=height),Appearance(shape='rect',x=width*GAP/2,y=height*Reality['wall-border-ratio'],color='#FFFF00')]))
-    Entities.push(add_components(Entity(label='Wall_Down-R'),[Collisionable(),Position(x=width-width*GAP/2,y=height),Appearance(shape='rect',x=width*GAP/2,y=height*Reality['wall-border-ratio'],color='#FFFF00')]))
+    Entities.push(add_components(Entity(label='Wall_Up-L'),  [Collisionable(),Position(x=Reality.offset_x+Reality.width*GAP/2,y=Reality.offset_y),Appearance(shape='rect',x=Reality.width*GAP/2,y=Reality.height*Reality['wall-border-ratio'],color='#FFFF00')]))
+    Entities.push(add_components(Entity(label='Wall_Up-R'),  [Collisionable(),Position(x=Reality.width-Reality.width*GAP/2,y=Reality.offset_y),Appearance(shape='rect',x=Reality.width*GAP/2,y=Reality.height*Reality['wall-border-ratio'],color='#FFFF00')]))
+    Entities.push(add_components(Entity(label='Wall_Right'), [Collisionable(),Position(x=Reality.width,y=Reality.get_centery()),Appearance(shape='rect',x=Reality.width*Reality["wall-border-ratio"],y=Reality.height/2,color='#FFFF00')]))
+    Entities.push(add_components(Entity(label='Wall_Left'),  [Collisionable(),Position(x=Reality.offset_x,y=Reality.get_centery()),Appearance(shape='rect',x=Reality.width*Reality["wall-border-ratio"],y=Reality.height/2,color='#FFFF00')]))
+    Entities.push(add_components(Entity(label='Wall_Down-L'),[Collisionable(),Position(x=Reality.offset_x+Reality.width*GAP/2,y=Reality.offset_y+Reality.height),Appearance(shape='rect',x=Reality.width*GAP/2,y=Reality.height*Reality['wall-border-ratio'],color='#FFFF00')]))
+    Entities.push(add_components(Entity(label='Wall_Down-R'),[Collisionable(),Position(x=Reality.width-Reality.width*GAP/2,y=Reality.offset_y+Reality.height),Appearance(shape='rect',x=Reality.width*GAP/2,y=Reality.height*Reality['wall-border-ratio'],color='#FFFF00')]))
 
     // Strikers
-    Entities.push(add_components(Entity(label='Striker_Down'),[Collides('noclip'),Botsify(Reality['striker-speed']), Collisionable(),Position(x=width/2,y=height),Velocity(0,0),Appearance(shape='rect',x=width*NOGAP/2,y=height*Reality['wall-border-ratio'],color='#FF00FF')]))
-    Entities.push(add_components(Entity(label='Striker_Up'),  [Collides('noclip'),Botsify(Reality['striker-speed']), Collisionable(),Position(x=width/2,y=0),Velocity(0,0),Appearance(shape='rect',x=width*NOGAP/2,y=height*Reality['wall-border-ratio'],color='#FF00FF')]))
+    Entities.push(add_components(Entity(label='Striker_Down'),[TrackScore(),Collides('noclip'),Botsify("global"), Collisionable(),Position(x=Reality.offset_x+Reality.width/2,y=Reality.offset_y+Reality.height),Velocity(0,0),Appearance(shape='rect',x=Reality.width*NOGAP/2,y=Reality.height*Reality['wall-border-ratio'],color='#FF00FF')]))
+    Entities.push(add_components(Entity(label='Striker_Up'),  [TrackScore(),Collides('noclip'),Botsify("global"), Collisionable(),Position(x=Reality.offset_x+Reality.width/2,y=Reality.offset_y),Velocity(0,0),Appearance(shape='rect',x=Reality.width*NOGAP/2,y=Reality.height*Reality['wall-border-ratio'],color='#FF00FF')]))
     
     // Interactors // Accelerators
     // Should interactors return to the center
     NUM_ATTRACTORS = Math.floor(Reality['field-cardinality']*Reality['field-balance'])
     for (var i = 0; i < NUM_ATTRACTORS; i++){
-    Entities.push(add_components(Entity(label='Interactor'),[InfluencedByField(1,K),Returnable(x='random',y='random',vx='random',vy='random'),ExertsField(1,Reality.FieldIntensity),Collides('bounce'),Position(x=Reality.randpos()[0],y=Reality.randpos()[1]),Velocity(k*randsign()*randint(Reality.minvel,Reality.maxvel),k*randsign()*randint(Reality.minvel,Reality.maxvel)),Acceleration(0,0),Appearance(shape='circle',x=1.3*Reality['puck-dim'],y=1.3*Reality['puck-dim'],color='#FF0000')]))
+    Entities.push(add_components(Entity(label='Interactor'),[InfluencedByField(1,Reality.between_interactors_interaction),Returnable(x='random',y='random',vx='random',vy='random'),ExertsField(1,Reality.FieldIntensity),Collides('bounce'),Position(x=Reality.randpos()[0],y=Reality.randpos()[1]),Velocity(Reality.interactor_init_vel_k*randsign()*randint(Reality.minvel,Reality.maxvel),Reality.interactor_init_vel_k*randsign()*randint(Reality.minvel,Reality.maxvel)),Acceleration(0,0),Appearance(shape='circle',x=1.3*Reality['puck-dim'],y=1.3*Reality['puck-dim'],color='#FF0000')]))
     }
     NUM_REPULSORS = Math.floor(Reality['field-cardinality']*(1-Reality['field-balance']))
     for (var i = 0; i < NUM_REPULSORS; i++){
-        Entities.push(add_components(Entity(label='Interactor'),[InfluencedByField(-1,K),Returnable(x='random',y='random',vx='random',vy='random'),ExertsField(-1,Reality.FieldIntensity),Collides('bounce'),Position(x=Reality.randpos()[0],y=Reality.randpos()[1]),Velocity(k*randsign()*randint(Reality.minvel,Reality.maxvel),k*randsign()*randint(Reality.minvel,Reality.maxvel)),Acceleration(0,0),Appearance(shape='circle',x=1.3*Reality['puck-dim'],y=1.3*Reality['puck-dim'],color='#0000FF' )]))
+        Entities.push(add_components(Entity(label='Interactor'),[InfluencedByField(-1,Reality.between_interactors_interaction),Returnable(x='random',y='random',vx='random',vy='random'),ExertsField(-1,Reality.FieldIntensity),Collides('bounce'),Position(x=Reality.randpos()[0],y=Reality.randpos()[1]),Velocity(Reality.interactor_init_vel_k*randsign()*randint(Reality.minvel,Reality.maxvel),Reality.interactor_init_vel_k*randsign()*randint(Reality.minvel,Reality.maxvel)),Acceleration(0,0),Appearance(shape='circle',x=1.3*Reality['puck-dim'],y=1.3*Reality['puck-dim'],color='#0000FF' )]))
         }
     
     Reality.Collisionables = collectItems(Entities,'"Collisionable" in item.components')
     Reality.Pucks = collectItems(Entities,'item.label.includes("Puck")')
     Reality.Exerters = collectItems(Entities,'"ExertsField" in item.components')
     Reality.Influenceds = collectItems(Entities,'"InfluencedByField" in item.components')
+    Reality.Strikers = collectItems(Entities,'"TrackScore" in item.components')
 }
 
   function draw() {
@@ -374,11 +446,12 @@ function setup() {
     Entities.forEach((item,index) =>{
         RenderSystem(item);
         MoveSystem(item,Reality.timedelta,Reality);
+        keyControlSystem(item,Reality)
         BotSystem(item,Reality,Entities);
-        CollisionSystem(item,index,Reality,Entities);
-        ReturnSystem(item,Reality)
+        CollisionSystem(item,index,Reality,Entities);//Must be after Control and bots for collisions against walls work
+        ReturnSystem(item,Reality,Entities)
         FieldSystem(item,index,Reality,Entities)
-        //PlayerControlSystem()
+        ShowScoreSystem(item)
     });
 
   }
