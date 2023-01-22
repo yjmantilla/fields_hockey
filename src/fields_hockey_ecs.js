@@ -512,7 +512,7 @@ function handle_strikers_control(){
     }
 
 }
-explanation_str="Description:\nSo, imagine ping-pong (or air-hockey) but with charged particles... In other words, a game-field with attraction-repulsion fields inside. This is sort of what is happening here.\n\nInstructions:\n1.Click on 'Open Controls' to edit gameplay\n2.For Human Playing Click on 'Strikers' and choose anything besides cpu for each side.\n3.You can experiment by clicking on 'Attractors and Repulsors' and then click on 'Repopulate with settings'.\n4.Enjoy!"
+explanation_str="Description:\nSo, imagine ping-pong (or air-hockey) but with charged particles... In other words, a game-field with attraction-repulsion fields inside. This is sort of what is happening here.\n\nInstructions:\n1.Click on 'Open Controls' to edit gameplay.\n2.For Human Playing Click on 'Strikers' and choose anything besides cpu for each side.\n3.You can experiment by clicking on 'Attractors and Repulsors' and then click on 'Repopulate with settings'.\n4.Enjoy!"
 window.alert(explanation_str)
 
 function setup() {
