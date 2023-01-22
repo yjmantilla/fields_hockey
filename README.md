@@ -9,3 +9,5 @@ Instructions:
 2. For Human Playing Click on 'Strikers' and choose anything besides cpu for each side.
 3. You can experiment by clicking on 'Attractors and Repulsors' and then click on 'Repopulate with settings'.
 4. Enjoy!
+
+This was a little project I made to experiment with the Entity-Component-System programming paradigm within javascript.
